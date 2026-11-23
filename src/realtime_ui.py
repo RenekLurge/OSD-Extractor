@@ -20,6 +20,7 @@ from tkinter import ttk, filedialog, messagebox
 import cv2
 from PIL import Image, ImageTk
 
+from i18n import t
 from ocr_engine import TraditionalReader
 from logic_analyzer import analyze, logic_from_template
 from roi_template import load_template, scale_rois
@@ -30,7 +31,7 @@ OCR_INTERVAL = 0.5       # 识别采样间隔（秒）
 class RealtimeApp:
     def __init__(self, root):
         self.root = root
-        root.title("程序 2：实时参数提取")
+        root.title(t("realtime_title"))
         root.geometry("1500x760")
         root.report_callback_exception = self._on_tk_error
 
@@ -64,7 +65,7 @@ class RealtimeApp:
         self._imgtk = None
 
         self._build_ui()
-        self.log("打开视频并载入模板后点\"开始\"。素材文件名需为英文/数字（cv2 限制）。")
+        self.log(t("log_start_hint"))
 
     # ---------------- UI ----------------
     def _build_ui(self):
@@ -75,30 +76,30 @@ class RealtimeApp:
 
         ctrl = tk.Frame(left)
         ctrl.pack(fill=tk.X, padx=6, pady=3)
-        ttk.Button(ctrl, text="打开视频", command=self.open_video).pack(side=tk.LEFT, padx=2)
-        ttk.Button(ctrl, text="载入模板", command=self.load_tpl).pack(side=tk.LEFT, padx=2)
-        ttk.Button(ctrl, text="开始", command=self.start).pack(side=tk.LEFT, padx=2)
-        ttk.Button(ctrl, text="暂停", command=self.pause).pack(side=tk.LEFT, padx=2)
+        ttk.Button(ctrl, text=t("btn_open_video"), command=self.open_video).pack(side=tk.LEFT, padx=2)
+        ttk.Button(ctrl, text=t("btn_load_tpl"), command=self.load_tpl).pack(side=tk.LEFT, padx=2)
+        ttk.Button(ctrl, text=t("btn_start"), command=self.start).pack(side=tk.LEFT, padx=2)
+        ttk.Button(ctrl, text=t("btn_pause"), command=self.pause).pack(side=tk.LEFT, padx=2)
         self.loop_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(ctrl, text="循环播放", variable=self.loop_var,
+        ttk.Checkbutton(ctrl, text=t("chk_loop"), variable=self.loop_var,
                         command=self._on_loop_toggle).pack(side=tk.LEFT, padx=6)
         self.box_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(ctrl, text="显示ROI框", variable=self.box_var).pack(side=tk.LEFT, padx=6)
-        tk.Label(ctrl, text="识别间隔(s):").pack(side=tk.LEFT, padx=(10, 2))
+        ttk.Checkbutton(ctrl, text=t("chk_box"), variable=self.box_var).pack(side=tk.LEFT, padx=6)
+        tk.Label(ctrl, text=t("lbl_interval")).pack(side=tk.LEFT, padx=(10, 2))
         self.interval_var = tk.StringVar(value=str(OCR_INTERVAL))
         ttk.Entry(ctrl, textvariable=self.interval_var, width=5).pack(side=tk.LEFT)
-        self.state_lab = tk.Label(ctrl, text="状态：未开始", fg="#666")
+        self.state_lab = tk.Label(ctrl, text=t("state_idle"), fg="#666")
         self.state_lab.pack(side=tk.LEFT, padx=10)
 
         right = tk.Frame(self.root, width=400)
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=8, pady=8)
         right.pack_propagate(False)
-        tk.Label(right, text="参数面板（黑=有数据，灰=暂无数据）",
+        tk.Label(right, text=t("panel_hint"),
                  font=("", 9), fg="#555").pack(anchor=tk.W)
         self.panel = tk.Frame(right)
         self.panel.pack(fill=tk.X, pady=4)
         ttk.Separator(right).pack(fill=tk.X, pady=4)
-        tk.Label(right, text="日志", font=("", 11, "bold")).pack(anchor=tk.W)
+        tk.Label(right, text=t("log_box"), font=("", 11, "bold")).pack(anchor=tk.W)
         self.log_box = tk.Text(right, height=20, state=tk.DISABLED, bg="#f5f5f5")
         self.log_box.pack(fill=tk.BOTH, expand=True, pady=4)
 
@@ -109,9 +110,9 @@ class RealtimeApp:
         for w in self.panel.winfo_children():
             w.destroy()
         if not self.template:
-            tk.Label(self.panel, text="未载入模板", fg="#888").pack(anchor=tk.W)
+            tk.Label(self.panel, text=t("panel_no_tpl"), fg="#888").pack(anchor=tk.W)
             return
-        tk.Label(self.panel, text="%-14s %s" % ("参数", "数值"),
+        tk.Label(self.panel, text="%-14s %s" % (t("panel_param"), t("panel_value")),
                  font=("Consolas", 10)).pack(anchor=tk.W)
         self.val_labs = {}
         for r in self.scaled_rois:
@@ -133,17 +134,16 @@ class RealtimeApp:
         if not path:
             return
         if any(ord(c) > 127 for c in path):
-            messagebox.showerror("路径不支持",
-                                 "素材路径/文件名不能含中文（cv2 限制）。\n请复制成英文名，如 samples\\demo.mp4")
+            messagebox.showerror("Error", t("msg_bad_path"))
             return
         self.pause()
         cap = cv2.VideoCapture(path)
         if not cap.isOpened():
-            messagebox.showerror("打开失败", "视频打不开。若为 .m4s 分片，先用 ffmpeg 转 .mp4")
+            messagebox.showerror("Error", t("msg_video_fail"))
             return
         self.cap = cap
         self.fps = cap.get(cv2.CAP_PROP_FPS) or 30
-        self.log("视频已打开：%s（%.1f FPS）" % (os.path.basename(path), self.fps))
+        self.log(t("log_open") % (os.path.basename(path), self.fps))
 
     def load_tpl(self):
         path = filedialog.askopenfilename(filetypes=[("模板", "*.json"), ("所有", "*.*")])
@@ -164,21 +164,20 @@ class RealtimeApp:
             self.results = {}
         self._overlay_scale = None
         self.build_panel()
-        self.log("模板已载入：%d 个 ROI（源 %sx%s -> 按当前视频比例缩放）"
-                 % (len(self.scaled_rois), self.template["source_width"],
-                    self.template["source_height"]))
+        self.log(t("log_tpl") % (len(self.scaled_rois), self.template["source_width"],
+                                 self.template["source_height"]))
 
     # ---------------- 播放控制 ----------------
     def start(self):
         if self.cap is None:
-            messagebox.showwarning("缺少视频", "先打开视频")
+            messagebox.showwarning("Warning", t("msg_no_video"))
             return
         if not self.template:
-            messagebox.showwarning("缺少模板", "先载入 roi_template.json")
+            messagebox.showwarning("Warning", t("msg_no_tpl"))
             return
         if (self.capture_thread and self.capture_thread.is_alive()) or \
                 (self.ocr_thread and self.ocr_thread.is_alive()):
-            self.log("已有播放线程在运行，先点暂停")
+            self.log(t("msg_running"))
             return
         try:
             interval = float(self.interval_var.get())
@@ -203,14 +202,14 @@ class RealtimeApp:
                                            args=(interval,), daemon=True)
         self.ocr_thread.start()
         self.play_state = "playing"
-        self.state_lab.config(text="状态：播放中（模板后台初始化中…）", fg="#006600")
+        self.state_lab.config(text=t("state_init"), fg="#006600")
         self.root.after(15, self._tick)
 
     def pause(self):
         self.stop_flag.set()
         if self.play_state == "playing":
             self.play_state = "paused"
-            self.state_lab.config(text="状态：已暂停（识别线程收尾中…）", fg="#a05000")
+            self.state_lab.config(text=t("state_paused"), fg="#a05000")
 
     # ---------------- 工作线程（不碰 tkinter） ----------------
     def _post(self, text):
@@ -246,12 +245,12 @@ class RealtimeApp:
                 except queue.Full:
                     pass
                 if count % 60 == 0:
-                    self._post("已处理 %d 帧" % count)
+                    self._post(t("log_frames") % count)
                 time.sleep(max(frame_dt - 0.001, 0))
             if not self.stop_flag.is_set():
                 self._post(("state", "ended"))
         except Exception:
-            self._post("读帧线程异常：\n" + traceback.format_exc())
+            self._post(t("log_cap_thread_err") % traceback.format_exc())
         finally:
             self.capture_done = True
 
@@ -259,11 +258,11 @@ class RealtimeApp:
         """识别线程：按间隔对最新帧识别；暂停/播完时把当前帧处理完再收尾。"""
         try:
             while self.trad is None:
-                self._post("模板初始化中…")
+                self._post(t("log_tpl_init"))
                 t0 = time.perf_counter()
                 self.trad = TraditionalReader()
-                self._post("模板就绪（%.1f 秒，%d 个模板）"
-                           % (time.perf_counter() - t0, len(self.trad.templates)))
+                self._post(t("log_tpl_ready") % (time.perf_counter() - t0,
+                                                 len(self.trad.templates)))
             first = True
             while not self.stop_flag.is_set():
                 with self.frame_lock:
@@ -274,16 +273,16 @@ class RealtimeApp:
                     time.sleep(0.1)
                     continue
                 if first:
-                    self._post("第一轮识别开始…")
+                    self._post(t("log_first_start"))
                 t0 = time.perf_counter()
                 self._ocr_frame(frame)
                 ms = int((time.perf_counter() - t0) * 1000)
                 self.last_ocr_ms = ms
                 if first:
-                    self._post("第一轮识别完成（%d ms）" % ms)
+                    self._post(t("log_first_done") % ms)
                     first = False
                 elif ms > 1500:
-                    self._post("识别用时 %d ms（偏慢，可调大识别间隔）" % ms)
+                    self._post(t("log_slow") % ms)
                 if self.capture_done and not self.stop_flag.is_set():
                     break
                 time.sleep(max(interval - (time.perf_counter() - t0), 0.05))
@@ -293,13 +292,13 @@ class RealtimeApp:
                 with self.frame_lock:
                     frame = self.latest_frame
                 if frame is not None:
-                    self._post("暂停收尾：识别最后一帧…")
+                    self._post(t("log_pause_final"))
                     t0 = time.perf_counter()
                     self._ocr_frame(frame)
                     self.last_ocr_ms = int((time.perf_counter() - t0) * 1000)
-            self._post("识别收尾完成")
+            self._post(t("log_finish"))
         except Exception:
-            self._post("识别线程异常：\n" + traceback.format_exc())
+            self._post(t("log_ocr_thread_err") % traceback.format_exc())
 
     def _ocr_frame(self, frame):
         """采样帧识别：结果挂进 results；画面没变的框沿用文本。"""
@@ -321,10 +320,10 @@ class RealtimeApp:
                     text, _ = analyze(cells, r, self.logic_cfg, bw, self.formats)
                 except Exception as e:
                     text, score = "ERR", -1.0
-                    self._post("识别异常 %s: %s" % (name, e))
+                    self._post(t("log_rec_err") % (name, e))
                 if name not in self._score_seen:
                     self._score_seen.add(name)
-                    self._post("ROI [%s] 首次识别分数 %.2f" % (name, score))
+                    self._post(t("log_score") % (name, score))
                 if res is None:
                     res = {"text": "", "last_crop": None}
                     self.results[name] = res
@@ -333,7 +332,7 @@ class RealtimeApp:
                 res["text"] = text
                 res["last_crop"] = gray_small
         for name, text in updates:
-            self._post("更新：%s = %s" % (name, text))
+            self._post(t("log_update") % (name, text))
 
     # ---------------- 主线程刷新 ----------------
     def _tick(self):
@@ -346,13 +345,13 @@ class RealtimeApp:
                 if isinstance(msg, tuple) and msg[0] == "state":
                     if msg[1] == "ended" and self.play_state == "playing":
                         self.play_state = "ended"
-                        self.state_lab.config(text="状态：播放结束（识别收尾中…）", fg="#333")
+                        self.state_lab.config(text=t("state_ended"), fg="#333")
                 else:
-                    if msg == "识别收尾完成":
+                    if msg == t("log_finish"):
                         self._ocr_done = True
                         self._refresh_panel()
                         self._refresh_overlay()   # 画面叠加框同步收尾结果
-                        self.state_lab.config(text="状态：识别已收尾", fg="#333")
+                        self.state_lab.config(text=t("state_finished"), fg="#333")
                     self.log(msg)
             try:
                 frame = self.frame_q.get_nowait()
@@ -363,16 +362,16 @@ class RealtimeApp:
             if self.play_state == "playing":
                 self._refresh_panel()
                 ocr_ms = ("%d ms" % self.last_ocr_ms) if self.last_ocr_ms >= 0 else "-- ms"
-                self.state_lab.config(text="状态：播放中 帧%d  识别 %s" % (self.stat_frame, ocr_ms))
+                self.state_lab.config(text=t("state_playing") % (self.stat_frame, ocr_ms))
                 now = time.time()
                 if self.stat_frame > self._last_frame_seen:
                     self._last_frame_seen = self.stat_frame
                     self._last_progress_t = now
                 elif now - self._last_progress_t > 8:
-                    self.log("⚠ 8 秒无帧进展——程序疑似卡住，请把上面最后几条日志贴给 Claude")
+                    self.log(t("log_stall"))
                     self._last_progress_t = now
         except Exception:
-            self.log("界面刷新异常（已自愈）：\n" + traceback.format_exc())
+            self.log(t("log_ui_err") % traceback.format_exc())
         if self.play_state == "playing" or not self._ocr_done:
             self.root.after(15, self._tick)
 
@@ -437,8 +436,8 @@ class RealtimeApp:
 
     # ---------------- 日志 ----------------
     def _on_tk_error(self, exc, val, tb):
-        self.log("界面异常：%s: %s\n%s" % (exc.__name__, val,
-                                           "".join(traceback.format_tb(tb))))
+        self.log(t("log_ui_err") % ("%s: %s\n%s" % (exc.__name__, val,
+                                                    "".join(traceback.format_tb(tb)))))
 
     def log(self, text):
         self.log_box.config(state=tk.NORMAL)

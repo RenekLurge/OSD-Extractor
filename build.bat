@@ -1,8 +1,8 @@
 @echo off
-rem PyInstaller 打包：标注工具 + 实时提取（需先 pip install pyinstaller）
+rem Build standalone exes with PyInstaller (run: pip install pyinstaller first)
 cd /d "%~dp0"
-python -m PyInstaller -F -w -n "OCR标注工具" --distpath dist --workpath build --specpath build --exclude-module rapidocr_onnxruntime --exclude-module onnxruntime src/roi_annotator.py
-python -m PyInstaller -F -w -n "OCR实时提取" --distpath dist --workpath build --specpath build --exclude-module rapidocr_onnxruntime --exclude-module onnxruntime src/realtime_ui.py
+python -m PyInstaller -F -w -n "OSD-Annotator" --distpath dist --workpath build --specpath build --exclude-module rapidocr_onnxruntime --exclude-module onnxruntime src/roi_annotator.py
+python -m PyInstaller -F -w -n "OSD-Realtime" --distpath dist --workpath build --specpath build --exclude-module rapidocr_onnxruntime --exclude-module onnxruntime src/realtime_ui.py
 echo.
-echo 构建完成，产物在 dist 目录
+echo Done. Outputs are in the dist folder.
 pause

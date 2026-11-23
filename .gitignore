@@ -5,5 +5,4 @@ dist/
 *.spec
 logic_config.json
 samples/*
-!samples/demo_synthetic.jpg
 !samples/README.md

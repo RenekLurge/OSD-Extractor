@@ -1,81 +1,77 @@
-# OCR_reader —— 视频 OSD 参数实时提取
+# OSD-Extractor
 
-从含 OSD 参数叠加显示（On-Screen Display）的视频/图片中，实时提取文字数值（高度、电压、速度、时间、相机参数等），并在播放界面上同步显示。
+Real-time text extraction from video OSD (On-Screen Display) overlays — altitude, voltage, speed, flight time, camera parameters, etc. — displayed live alongside the playing video.
 
-**零模型依赖**：不使用任何神经网络 OCR 引擎，纯传统图像处理（Otsu 二值化 → 连通域切字 → 模板匹配 + 字符缓存 + 逻辑修正），CPU 上毫秒级识别。
+**No neural network OCR at all**: pure traditional image processing (Otsu binarization → connected-component glyph segmentation → template matching with caching → rule-based logic correction), millisecond-level on CPU.
 
-![演示](samples/demo_synthetic.jpg)
+> 中文文档见 [doc/](doc/)（需求分析 / 方案选择 / 使用流程 / 开发历程 / 不足说明）。
 
-## 特性
+## Features
 
-- **双程序工作流**：标注工具（一次标定 ROI + 标签 + 单位）→ 实时提取（播放即识别）
-- **一机一模板**：ROI、逻辑规则、标签格式全部打包在一个模板 json 里，换设备换模板
-- **逻辑分析模块**：单位在数字后、冒号白名单、时间自动分组、小数全局唯一（突出间隔判定 + 白像素校验）、标签格式语言（`?` = 一位数字，`*` = 不限位数）
-- **字体自适应**：模板库（含 Bahnschrift 等 DIN 系字体）+ 从素材自采集字符模板（像素级匹配 0.9999+）
-- **性能设计**：变化门控（画面没变不重复识别）、量化缓存、向量化模板匹配（分组预归一化 + 矩阵批量相关）、读帧/识别双线程解耦
-- **开箱即用**：PyInstaller 打包双 exe，目标机器零依赖
+- **Two-program workflow**: Annotator (calibrate ROIs, labels, units once) → Realtime extractor (play & extract)
+- **One machine, one template**: ROIs + logic rules + label formats packed into a single template JSON
+- **Logic analysis module**: unit-after-digits rule, colon allow-list, time auto-grouping, single-decimal-point policy (standout-gap detection + white-pixel verification), label format language (`?` = one digit, `*` = any digits split by separator position)
+- **Font-adaptive**: template bank (Bahnschrift etc.) + capture font templates from real footage (pixel-exact matching, 0.9999+)
+- **Performance**: change gating (unchanged ROIs skip recognition), quantized cache, vectorized template matching (height-grouped pre-normalization + batched correlation, 12x speedup), dual-thread capture/recognition
+- **Bilingual UI**: Chinese by default; set `OSD_LANG=en` or drop a `lang.txt` containing `en` next to the program for English
+- **Zero-dependency release**: PyInstaller exes (see `build.bat`)
 
-## 快速开始
+## Quick start
 
-**方式一（发布版，推荐）**：`dist/` 下两个 exe + `使用说明.txt`，Windows 10/11 x64 直接双击。
+Release binaries (Windows 10/11 x64, no Python needed): built via `build.bat` into `dist/`.
 
-**方式二（源码）**：
+From source:
 
 ```bash
-pip install -r requirements.txt        # opencv-python pillow numpy（rapidocr 可选）
-python src/roi_annotator.py            # 程序 1：标注 ROI
-python src/realtime_ui.py              # 程序 2：实时提取
+pip install -r requirements.txt        # opencv-python pillow numpy (rapidocr optional)
+python src/roi_annotator.py            # Program 1: annotate ROIs
+python src/realtime_ui.py              # Program 2: realtime extraction
 ```
 
-使用流程见 [doc/使用流程.md](doc/使用流程.md)。
+Usage walkthrough: [doc/使用流程.md](doc/使用流程.md) (中文).
 
-## 工作原理
-
-```
-视频/图片 → 抽帧(间隔采样) → ROI裁剪(模板) → 变化门控 → 预处理(灰度/放大/Otsu)
-→ 连通域切字(粘连切分) → 模板匹配(缓存+向量化) → 逻辑分析(单位/冒号/小数/格式)
-→ 面板+画面叠加输出
-```
-
-## 目录结构
+## How it works
 
 ```
-OCR_reader/
-├─ src/                     # 源码
-│  ├─ roi_annotator.py      # 程序1：ROI 标注工具（含字体采集/逻辑设置/标签格式）
-│  ├─ realtime_ui.py        # 程序2：实时提取 UI
-│  ├─ ocr_engine.py         # 传统模板匹配引擎（切字/匹配/缓存/粘连处理）
-│  ├─ logic_analyzer.py     # 逻辑分析模块（规则可配，随模板保存）
-│  ├─ roi_template.py       # 模板读写与缩放
-│  └─ paths.py              # 打包/源码双形态路径基座
-├─ doc/                     # 需求分析 / 方案选择 / 使用流程 / 开发历程
-├─ samples/                 # 素材（仓库只放合成演示图，真实素材自备）
-├─ 不足说明.md              # 项目不足与边界
-├─ build.bat                # PyInstaller 打包脚本
-└─ requirements.txt
+video/image → frame sampling (interval) → ROI crop (template) → change gate
+→ preprocessing (gray / upscale / Otsu) → glyph segmentation (merged-char splitting)
+→ template matching (cache + vectorized) → logic analysis (unit / colon / decimal / format)
+→ panel + on-screen overlay output
 ```
 
-## 模板与配置
+## Repository layout
 
-ROI 模板 json 结构（标注工具生成）：
+```
+src/
+  roi_annotator.py    # Program 1: ROI annotator (font capture, logic & format dialogs)
+  realtime_ui.py      # Program 2: realtime extractor UI
+  ocr_engine.py       # traditional matching engine (segmentation / matching / cache)
+  logic_analyzer.py   # rule-based post-processing (configurable, saved per template)
+  roi_template.py     # template load/save & scaling
+  i18n.py             # zh/en UI strings
+  paths.py            # frozen/source path base
+doc/                  # requirements, design choices, usage, dev history (中文)
+samples/              # your own footage goes here (not tracked)
+roi_template.json     # the device template (ROIs + logic + formats)
+run_annotator.bat / run_realtime.bat   # dev launchers
+build.bat             # PyInstaller packaging
+```
+
+## Template format
 
 ```json
 {
   "source_width": 1918, "source_height": 1078,
-  "logic": {"colon_labels": ["录制时间", "飞行时间", "相机参数"], "decimal_gap_ratio": 0.4},
-  "formats": {"飞行时间": ["??:??"], "相机参数": ["*:*"]},
-  "rois": [{"name": "海拔高度", "unit": "m", "with_unit_letters": true, "x": 895, "y": 158, "w": 216, "h": 63}]
+  "logic": {"colon_labels": ["Time"], "time_labels": ["Time"],
+            "text_unit_labels": ["Altitude"], "decimal_gap_ratio": 0.4},
+  "formats": {"Time": ["??:??"], "Camera": ["*:*"]},
+  "rois": [{"name": "Altitude", "unit": "m", "with_unit_letters": true,
+            "x": 895, "y": 158, "w": 216, "h": 63}]
 }
 ```
 
-## 打包发布
-
-```bat
-build.bat    # 需先 pip install pyinstaller
-```
+Full evolution & pitfalls log: [doc/开发历程.md](doc/开发历程.md) · Known limitations: [doc/不足说明.md](doc/不足说明.md)
 
 ## License
 
-MIT © 2026 龚界霖
-
-详见 [doc/开发历程.md](doc/开发历程.md)（完整演进与踩坑记录）、[不足说明.md](不足说明.md)。
+MIT © 2026 龚界霖 (Jielin Gong)

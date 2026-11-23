@@ -22,6 +22,7 @@ from tkinter import ttk, filedialog, messagebox
 import cv2
 from PIL import Image, ImageTk
 
+from i18n import t
 from ocr_engine import OCREngine, imread_any, TraditionalReader
 from logic_analyzer import load_config, logic_from_template
 from paths import base_dir
@@ -60,7 +61,7 @@ TEMPLATE_NAME = "roi_template.json"
 class App:
     def __init__(self, root):
         self.root = root
-        root.title("程序 1：ROI 标注工具")
+        root.title(t("annotator_title"))
         root.geometry("1360x760")
 
         self.cap = None
@@ -88,7 +89,7 @@ class App:
         self.formats = {}                # 标签格式定义：{标签: ["??:??", ...]}
 
         self._build_ui()
-        self.status("打开视频/图片开始（素材文件名请用英文/数字，cv2 不支持中文路径）")
+        self.status(t("status_start"))
 
     # ---------------- UI ----------------
     def _build_ui(self):
@@ -105,59 +106,59 @@ class App:
         self.slider = tk.Scale(bar, from_=0, to=1, orient=tk.HORIZONTAL,
                                command=self.on_slider, length=640)
         self.slider.pack(side=tk.LEFT, fill=tk.X, expand=True)
-        self.frame_lab = tk.Label(bar, text="帧: -")
+        self.frame_lab = tk.Label(bar, text=t("frame_lab") % ("-", "-", "-", "-"))
         self.frame_lab.pack(side=tk.LEFT, padx=8)
 
         right = tk.Frame(self.root, width=350)
         right.pack(side=tk.RIGHT, fill=tk.Y, padx=8, pady=8)
         right.pack_propagate(False)
 
-        ttk.Button(right, text="打开视频/图片", command=self.open_file).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="预识别当前帧 (OCR)", command=self.do_ocr).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="自动采样预识别 (25/50/75%)", command=self.do_auto_ocr).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="清除预识别结果", command=self.clear_ocr).pack(fill=tk.X, pady=2)
+        ttk.Button(right, text=t("btn_open"), command=self.open_file).pack(fill=tk.X, pady=2)
+        ttk.Button(right, text=t("btn_ocr"), command=self.do_ocr).pack(fill=tk.X, pady=2)
+        ttk.Button(right, text=t("btn_auto_ocr"), command=self.do_auto_ocr).pack(fill=tk.X, pady=2)
+        ttk.Button(right, text=t("btn_clear_ocr"), command=self.clear_ocr).pack(fill=tk.X, pady=2)
         ttk.Separator(right).pack(fill=tk.X, pady=6)
 
-        tk.Label(right, text="标签（选中框后改这里直接生效）：").pack(anchor=tk.W)
+        tk.Label(right, text=t("lbl_label")).pack(anchor=tk.W)
         self.label_var = tk.StringVar(value=LABELS[0])
         cb = ttk.Combobox(right, textvariable=self.label_var, values=LABELS, state="readonly")
         cb.pack(fill=tk.X, pady=2)
         cb.bind("<<ComboboxSelected>>", self._on_label_change)
-        tk.Label(right, text="自定义标签名（选\"自定义\"时生效）：").pack(anchor=tk.W)
+        tk.Label(right, text=t("lbl_custom_label")).pack(anchor=tk.W)
         self.custom_entry = tk.Entry(right)
         self.custom_entry.pack(fill=tk.X, pady=2)
         self.custom_entry.bind("<KeyRelease>", self._on_label_change)
-        tk.Label(right, text="数值单位（选中框后改这里直接生效）：").pack(anchor=tk.W)
+        tk.Label(right, text=t("lbl_unit")).pack(anchor=tk.W)
         self.unit_var = tk.StringVar(value=UNITS[0])
         ucb = ttk.Combobox(right, textvariable=self.unit_var, values=UNITS, state="readonly")
         ucb.pack(fill=tk.X, pady=2)
         ucb.bind("<<ComboboxSelected>>", self._on_unit_change)
-        tk.Label(right, text="自定义单位（选\"自定义\"时生效）：").pack(anchor=tk.W)
+        tk.Label(right, text=t("lbl_custom_unit")).pack(anchor=tk.W)
         self.unit_entry = tk.Entry(right)
         self.unit_entry.pack(fill=tk.X, pady=2)
         self.unit_entry.bind("<KeyRelease>", self._on_unit_change)
         self.text_unit_var = tk.BooleanVar(value=False)
-        ttk.Checkbutton(right, text="单位从画面识别（保留 m/km 等字母）",
+        ttk.Checkbutton(right, text=t("lbl_text_unit"),
                         variable=self.text_unit_var,
                         command=self._on_text_unit_change).pack(anchor=tk.W, pady=2)
-        tk.Label(right, text="空白处拖拽=画新框；点击框=选中（拖动移动/拉手柄调整）",
+        tk.Label(right, text=t("hint_draw"),
                  fg="#333").pack(anchor=tk.W, pady=2)
         ttk.Separator(right).pack(fill=tk.X, pady=6)
 
-        tk.Label(right, text="ROI 列表（单击选中 / 双击删除）：").pack(anchor=tk.W)
+        tk.Label(right, text=t("lbl_list")).pack(anchor=tk.W)
         self.roi_list = tk.Listbox(right, height=10)
         self.roi_list.pack(fill=tk.BOTH, expand=True, pady=2)
         self.roi_list.bind("<<ListboxSelect>>", self.on_list_select)
         self.roi_list.bind("<Double-Button-1>", self.del_roi)
         ttk.Separator(right).pack(fill=tk.X, pady=6)
 
-        ttk.Button(right, text="载入已有模板", command=self.load).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="保存 ROI 模板", command=self.save).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="采集字体模板（适配未知字体）",
+        ttk.Button(right, text=t("btn_load_tpl"), command=self.load).pack(fill=tk.X, pady=2)
+        ttk.Button(right, text=t("btn_save_tpl"), command=self.save).pack(fill=tk.X, pady=2)
+        ttk.Button(right, text=t("btn_capture"),
                    command=self.toggle_capture).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="逻辑设置（冒号标签/小数规则）",
+        ttk.Button(right, text=t("btn_logic"),
                    command=self.open_logic_dialog).pack(fill=tk.X, pady=2)
-        ttk.Button(right, text="标签格式（?=一位数字，如 ??:??）",
+        ttk.Button(right, text=t("btn_format"),
                    command=self.open_format_dialog).pack(fill=tk.X, pady=2)
         self.status_var = tk.StringVar(value="")
         tk.Label(right, textvariable=self.status_var, fg="#555",
@@ -166,19 +167,18 @@ class App:
     # ---------------- 文件与帧 ----------------
     def open_file(self):
         path = filedialog.askopenfilename(
-            filetypes=[("视频/图片", "*.mp4 *.avi *.mov *.mkv *.m4s *.jpg *.jpeg *.png *.bmp"),
-                       ("所有文件", "*.*")])
+            filetypes=[("Video/Image", "*.mp4 *.avi *.mov *.mkv *.m4s *.jpg *.jpeg *.png *.bmp"),
+                       ("All files", "*.*")])
         if not path:
             return
         if any(ord(c) > 127 for c in path):
-            messagebox.showerror("路径不支持",
-                                 "素材路径/文件名不能含中文（cv2 限制）。\n请复制成英文名，如 samples\\demo.mp4")
+            messagebox.showerror("Error", t("msg_bad_path"))
             return
         ext = os.path.splitext(path)[1].lower()
         if ext in (".jpg", ".jpeg", ".png", ".bmp"):
             img = imread_any(path)
             if img is None:
-                messagebox.showerror("打开失败", "图片读取失败")
+                messagebox.showerror("Error", t("msg_img_fail"))
                 return
             self.cap = None
             self.frame = img
@@ -187,9 +187,7 @@ class App:
             return
         cap = cv2.VideoCapture(path)
         if not cap.isOpened():
-            messagebox.showerror("打开失败",
-                                 "视频打不开。若为 .m4s 分片，先用 ffmpeg 转成 .mp4：\n"
-                                 "ffmpeg -i in.m4s -c copy out.mp4")
+            messagebox.showerror("Error", t("msg_video_fail"))
             return
         self.cap = cap
         self.total = int(cap.get(cv2.CAP_PROP_FRAME_COUNT)) or 1
@@ -222,7 +220,7 @@ class App:
         self._imgtk = ImageTk.PhotoImage(pil)
         self.canvas.delete("all")
         self.canvas.create_image(0, 0, anchor=tk.NW, image=self._imgtk)
-        self.frame_lab.config(text="帧: %d / %d   (%dx%d)" % (self.frame_idx + 1, self.total, w, h))
+        self.frame_lab.config(text=t("frame_lab") % (self.frame_idx + 1, self.total, w, h))
         self.draw_rois()
 
     def on_slider(self, val):
@@ -233,12 +231,12 @@ class App:
     # ---------------- OCR 预识别 ----------------
     def get_engine(self):
         if self.ocr is None:
-            self.status("初始化 OCR（首次较慢，请稍候）…")
+            self.status(t("status_ocr_init"))
             self.root.update_idletasks()
             try:
                 self.ocr = OCREngine()
             except RuntimeError as e:
-                messagebox.showerror("缺少依赖", str(e))
+                messagebox.showerror("Error", str(e))
                 return None
         return self.ocr
 
@@ -246,7 +244,7 @@ class App:
         eng = self.get_engine()
         if eng is None or self.frame is None:
             return
-        self.status("OCR 识别中…")
+        self.status("OCR running...")
         self.root.update_idletasks()
         items = eng.recognize(self.frame)
         self.canvas.delete("ocr")
@@ -256,14 +254,14 @@ class App:
             self.canvas.create_text(pts[0][0], pts[0][1] - 8, anchor=tk.SW,
                                     text="%s(%.2f)" % (text, score),
                                     fill="red", font=("", 8), tags="ocr")
-        self.status("OCR 完成：共 %d 个文字区域（红框）。参考红框位置画 ROI。" % len(items))
+        self.status(t("status_ocr_done") % len(items))
 
     def do_auto_ocr(self):
         eng = self.get_engine()
         if eng is None or self.cap is None:
-            self.status("自动采样只对视频有效")
+            self.status(t("status_auto_only"))
             return
-        self.status("自动采样预识别中（3 帧）…")
+        self.status("Auto sampling 3 frames...")
         self.root.update_idletasks()
         log = []
         best_idx, best_n = 0, -1
@@ -290,7 +288,7 @@ class App:
 
     def clear_ocr(self):
         self.canvas.delete("ocr")
-        self.status("预识别结果已清除")
+        self.status(t("status_ocr_clear"))
 
     # ---------------- ROI 画框与编辑 ----------------
     def _inside(self, r, ox, oy):
@@ -391,7 +389,7 @@ class App:
                 if abs(x1 - x0) >= 6 and abs(y1 - y0) >= 6:
                     label = self.label_var.get()
                     if label == "自定义":
-                        label = self.custom_entry.get().strip() or "未命名"
+                        label = self.custom_entry.get().strip() or t("unnamed")
                     unit = self.unit_var.get()
                     if unit == "自定义":
                         unit = self.unit_entry.get().strip()
@@ -407,7 +405,7 @@ class App:
                                       "h": int(h / self.disp_scale)})
                     self.selected = len(self.rois) - 1
                     self._sync_combos()
-                    self.status("已添加 ROI：%s" % label)
+                    self.status(t("status_added") % label)
         self._mode = None
         self._hid = None
         self._box0 = None
@@ -521,9 +519,9 @@ class App:
     def open_logic_dialog(self):
         cfg = dict(self.logic_cfg)
         dlg = tk.Toplevel(self.root)
-        dlg.title("逻辑设置（随模板保存，一机一模板）")
+        dlg.title(t("logic_dlg_title"))
 
-        tk.Label(dlg, text="冒号标签（这些标签保留冒号，其余标签删冒号）：").pack(anchor=tk.W, padx=8, pady=(8, 0))
+        tk.Label(dlg, text=t("logic_colon")).pack(anchor=tk.W, padx=8, pady=(8, 0))
         colon_vars = {}
         f1 = tk.Frame(dlg)
         f1.pack(padx=8)
@@ -533,7 +531,7 @@ class App:
             ttk.Checkbutton(f1, text=lab, variable=v).grid(
                 row=i // 4, column=i % 4, sticky=tk.W, padx=4)
 
-        tk.Label(dlg, text="时间标签（无冒号时自动两位分组）：").pack(anchor=tk.W, padx=8, pady=(8, 0))
+        tk.Label(dlg, text=t("logic_time")).pack(anchor=tk.W, padx=8, pady=(8, 0))
         time_vars = {}
         f2 = tk.Frame(dlg)
         f2.pack(padx=8)
@@ -543,7 +541,7 @@ class App:
             ttk.Checkbutton(f2, text=lab, variable=v).grid(
                 row=i // 4, column=i % 4, sticky=tk.W, padx=4)
 
-        tk.Label(dlg, text="单位从画面识别的标签（输出保留 m/km 等字母）：").pack(anchor=tk.W, padx=8, pady=(8, 0))
+        tk.Label(dlg, text=t("logic_textunit")).pack(anchor=tk.W, padx=8, pady=(8, 0))
         unit_vars = {}
         f3 = tk.Frame(dlg)
         f3.pack(padx=8)
@@ -553,7 +551,7 @@ class App:
             ttk.Checkbutton(f3, text=lab, variable=v).grid(
                 row=i // 4, column=i % 4, sticky=tk.W, padx=4)
 
-        tk.Label(dlg, text="屏蔽小数点的标签（不补点、删识别点）：").pack(anchor=tk.W, padx=8, pady=(8, 0))
+        tk.Label(dlg, text=t("logic_nodec")).pack(anchor=tk.W, padx=8, pady=(8, 0))
         nodec_vars = {}
         f3b = tk.Frame(dlg)
         f3b.pack(padx=8)
@@ -564,13 +562,11 @@ class App:
                 row=i // 4, column=i % 4, sticky=tk.W, padx=4)
 
         ttk.Separator(dlg).pack(fill=tk.X, padx=8, pady=6)
-        tk.Label(dlg, text="小数规则：").pack(anchor=tk.W, padx=8)
+        tk.Label(dlg, text=t("logic_dec")).pack(anchor=tk.W, padx=8)
         f4 = tk.Frame(dlg)
         f4.pack(padx=8)
-        rows = [("补点最小字高比例", "decimal_gap_ratio"),
-                ("仅两个数字时的比例", "decimal_gap_single"),
-                ("突出间隔倍数", "decimal_standout_mult"),
-                ("点移动倍数", "decimal_move_mult")]
+        rows = list(zip(t("logic_rows"), ["decimal_gap_ratio", "decimal_gap_single",
+                                          "decimal_standout_mult", "decimal_move_mult"]))
         ents = {}
         for i, (txt, key) in enumerate(rows):
             tk.Label(f4, text=txt).grid(row=i, column=0, sticky=tk.W, pady=1)
@@ -581,9 +577,9 @@ class App:
         en_ins = tk.BooleanVar(value=cfg["enable_insert"])
         en_mov = tk.BooleanVar(value=cfg["enable_move"])
         en_ink = tk.BooleanVar(value=cfg.get("gap_pixel_check", True))
-        ttk.Checkbutton(f4, text="允许漏检补点", variable=en_ins).grid(row=4, column=0, sticky=tk.W)
-        ttk.Checkbutton(f4, text="允许点移动", variable=en_mov).grid(row=4, column=1, sticky=tk.W)
-        ttk.Checkbutton(f4, text="仅两个数字时校验间隔白像素",
+        ttk.Checkbutton(f4, text=t("logic_ins"), variable=en_ins).grid(row=4, column=0, sticky=tk.W)
+        ttk.Checkbutton(f4, text=t("logic_mov"), variable=en_mov).grid(row=4, column=1, sticky=tk.W)
+        ttk.Checkbutton(f4, text=t("logic_ink"),
                         variable=en_ink).grid(row=5, column=0, columnspan=2, sticky=tk.W)
 
         def do_save():
@@ -596,28 +592,26 @@ class App:
                 try:
                     new_cfg[key] = float(e.get())
                 except ValueError:
-                    messagebox.showwarning("数值无效", "%s 需为数字" % key)
+                    messagebox.showwarning("Warning", t("logic_badnum") % key)
                     return
             new_cfg["enable_insert"] = en_ins.get()
             new_cfg["enable_move"] = en_mov.get()
             new_cfg["gap_pixel_check"] = en_ink.get()
             self.logic_cfg = new_cfg
             dlg.destroy()
-            self.status("逻辑已更新。点\"保存 ROI 模板\"写入模板文件后，实时程序载入即生效。")
+            self.status(t("status_logic_saved"))
 
-        tk.Button(dlg, text="保存", command=do_save).pack(pady=8)
+        tk.Button(dlg, text=t("logic_save"), command=do_save).pack(pady=8)
 
     # ---------------- 标签格式定义 ----------------
     def open_format_dialog(self):
         dlg = tk.Toplevel(self.root)
-        dlg.title("标签格式定义（随模板保存）")
-        tk.Label(dlg, text="语法：? = 一位数字；* = 不限位数（1位以上，按分隔符位置分割）；\n"
-                           "其他字符按原样。\n"
-                           "例：??:??（时间两位比两位） *:*（相机参数 7:100） ??.?（两位一小数）",
+        dlg.title(t("fmt_dlg_title"))
+        tk.Label(dlg, text=t("fmt_hint"),
                  justify=tk.LEFT).pack(padx=8, pady=4, anchor=tk.W)
         f1 = tk.Frame(dlg)
         f1.pack(padx=8, pady=2)
-        tk.Label(f1, text="选择标签：").pack(side=tk.LEFT)
+        tk.Label(f1, text=t("fmt_pick")).pack(side=tk.LEFT)
         label_var = tk.StringVar(value=LABELS[0])
         cb = ttk.Combobox(f1, textvariable=label_var, values=LABELS[:-1],
                           state="readonly")
@@ -634,7 +628,7 @@ class App:
         refresh()
         f2 = tk.Frame(dlg)
         f2.pack(padx=8, pady=4)
-        tk.Label(f2, text="新格式：").pack(side=tk.LEFT)
+        tk.Label(f2, text=t("fmt_new")).pack(side=tk.LEFT)
         entry = tk.Entry(f2, width=20)
         entry.pack(side=tk.LEFT, padx=4)
 
@@ -652,19 +646,18 @@ class App:
                 del self.formats[label_var.get()][sel[0]]
                 refresh()
 
-        ttk.Button(f2, text="添加", command=add).pack(side=tk.LEFT)
-        ttk.Button(f2, text="删除选中", command=rem).pack(side=tk.LEFT, padx=4)
-        tk.Button(dlg, text="完成（点\"保存 ROI 模板\"时写入模板）",
+        ttk.Button(f2, text=t("fmt_add"), command=add).pack(side=tk.LEFT)
+        ttk.Button(f2, text=t("fmt_del"), command=rem).pack(side=tk.LEFT, padx=4)
+        tk.Button(dlg, text=t("fmt_done"),
                   command=dlg.destroy).pack(pady=6)
 
     # ---------------- 字体模板采集 ----------------
     def toggle_capture(self):
         self.capture_mode = not self.capture_mode
         if self.capture_mode:
-            self.status("采集模式：在画面上框住一段字符清晰、不粘连的文本，"
-                        "弹窗里输入真值即可存为模板。")
+            self.status(t("status_cap_on"))
         else:
-            self.status("采集模式已关闭")
+            self.status(t("status_cap_off"))
 
     def _capture_region(self, x0, y0, x1, y1):
         if self.frame is None:
@@ -675,21 +668,20 @@ class App:
         ow, oh = int(w / self.disp_scale), int(h / self.disp_scale)
         crop = self.frame[oy:oy + oh, ox:ox + ow]
         if crop.size == 0:
-            self.status("采集区域无效")
+            self.status(t("status_cap_fail"))
             return
         self._tr_cap = TraditionalReader()
         bw, rects = self._tr_cap.segment(crop)
         if not rects:
-            self.status("采集失败：区域内没切出字符，框准一点（避开粘连段）")
+            self.status(t("status_cap_fail"))
             return
         self._cap_cells = [bw[y:y + h, x:x + w] for x, y, w, h in rects]
         self._show_capture_dialog()
 
     def _show_capture_dialog(self):
         dlg = tk.Toplevel(self.root)
-        dlg.title("字体模板采集")
-        tk.Label(dlg, text="切出 %d 个字符。输入真值（从左到右、无分隔），保存后重启实时程序生效："
-                 % len(self._cap_cells)).pack(padx=8, pady=4)
+        dlg.title(t("cap_dlg_title"))
+        tk.Label(dlg, text=t("cap_dlg_prompt") % len(self._cap_cells)).pack(padx=8, pady=4)
         row = tk.Frame(dlg)
         row.pack()
         self._cap_imgs = []
@@ -701,15 +693,14 @@ class App:
             tk.Label(row, image=imgtk, bg="black").pack(side=tk.LEFT, padx=2)
         self._cap_entry = tk.Entry(dlg, width=40, font=("", 12))
         self._cap_entry.pack(padx=8, pady=6)
-        tk.Button(dlg, text="保存到模板库",
+        tk.Button(dlg, text=t("cap_dlg_save"),
                   command=lambda: self._save_capture(dlg)).pack(pady=4)
 
     def _save_capture(self, dlg):
         truth = self._cap_entry.get().strip()
         if len(truth) != len(self._cap_cells):
-            messagebox.showwarning("数量不匹配",
-                                   "切出 %d 个字符，真值输入了 %d 个。请调整框或输入。"
-                                   % (len(self._cap_cells), len(truth)))
+            messagebox.showwarning("Warning",
+                                   t("cap_dlg_mismatch") % (len(self._cap_cells), len(truth)))
             return
         import json
         import time
@@ -730,11 +721,11 @@ class App:
         json.dump(manifest, open(manifest_path, "w", encoding="utf-8"),
                   ensure_ascii=False, indent=2)
         dlg.destroy()
-        self.status("已保存 %d 个字符模板到 templates_custom。重启实时程序生效。" % len(truth))
+        self.status(t("status_cap_saved") % len(truth))
 
     # ---------------- 模板存取 ----------------
     def load(self):
-        path = filedialog.askopenfilename(filetypes=[("模板", "*.json"), ("所有", "*.*")])
+        path = filedialog.askopenfilename(filetypes=[("Template", "*.json"), ("All files", "*.*")])
         if not path:
             return
         t = load_template(path)
@@ -743,12 +734,12 @@ class App:
         self.formats = t.get("formats") or {}
         self.selected = None
         self.draw_rois()
-        self.status("已载入 %d 个 ROI 及逻辑设置（模板源分辨率 %sx%s，与当前素材不同会自动按比例缩放）"
-                    % (len(self.rois), t["source_width"], t["source_height"]))
+        self.status(t("status_tpl_loaded") % (len(self.rois), t["source_width"],
+                                              t["source_height"]))
 
     def save(self):
         if not self.rois:
-            messagebox.showwarning("没有 ROI", "先在画面上画至少一个框")
+            messagebox.showwarning("Warning", t("msg_no_roi"))
             return
         if self.frame is None:
             return
@@ -761,7 +752,7 @@ class App:
             initialdir=os.path.dirname(default_out),
             initialfile=TEMPLATE_NAME,
             defaultextension=".json",
-            filetypes=[("模板", "*.json"), ("所有", "*.*")])
+            filetypes=[("Template", "*.json"), ("All files", "*.*")])
         if not out:
             return
         save_template(out, t)
@@ -771,7 +762,7 @@ class App:
             cv2.rectangle(prev, (r["x"], r["y"]), (r["x"] + r["w"], r["y"] + r["h"]),
                           (0, 255, 0), 2)
         cv2.imwrite(os.path.splitext(out)[0] + "_preview.jpg", prev)
-        self.status("已保存：%s（含 ROI + 逻辑设置 + 预览图）。实时程序载入即用。" % os.path.abspath(out))
+        self.status(t("status_saved") % os.path.abspath(out))
 
     def status(self, text):
         self.status_var.set(text)
